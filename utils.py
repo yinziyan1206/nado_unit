@@ -4,7 +4,7 @@ __author__ = 'ziyan.yin'
 from threading import Lock
 from typing import Dict
 
-from unit import units
+from .unit import units
 
 locks: Dict[str, Lock] = dict()
 

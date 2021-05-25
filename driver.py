@@ -1,0 +1,157 @@
+#!/usr/bin/env python
+__author__ = 'ziyan.yin'
+
+import asyncio
+import logging
+import os
+import pickle
+from asyncio import QueueEmpty
+
+from . import utils
+
+BUF_SIZE = 1024
+HOST = ''
+PORT = 11211
+
+white_list = [
+    '127.0.0.1'
+]
+data_format = {
+    'success': True,
+    'data': '',
+    'message': '',
+    'code': 0,
+}
+logger = logging.getLogger('unit')
+
+
+try:
+    import uvloop as loop_policy
+except ImportError:
+    loop_policy = None
+
+if loop_policy:
+    asyncio.set_event_loop_policy(loop_policy.EventLoopPolicy())
+loop = asyncio.get_event_loop()
+
+_queues = [asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()]
+_mutex = asyncio.Semaphore()
+
+
+class ParamsError(Exception):
+    pass
+
+
+class UnknownServiceError(Exception):
+    pass
+
+
+def __get_unit(command):
+    return utils.get_unit(command['service'], command['method'])
+
+
+def __struct(data):
+    data = pickle.dumps(data, protocol=5)
+    length = '00000000000{0}'.format(len(data))
+    return memoryview(('%s' % (length[-12:])).encode() + data)
+
+
+def create_task(message):
+    command = pickle.loads(message, encoding='utf-8')
+    if 'service' in command and 'method' in command:
+        ret, task = __get_unit(command)
+        if ret:
+            param = command['param'] if 'param' in command else {'action': 'view'}
+            return task(param, operator=command['operator'], ip=command['ip'])
+        else:
+            raise UnknownServiceError(task)
+    else:
+        raise ParamsError()
+
+
+async def consume():
+    while True:
+        q = _queues[0]
+        task, writer = None, None
+        for queue in _queues:
+            try:
+                task, writer = queue.get_nowait()
+                q = queue
+                break
+            except QueueEmpty:
+                continue
+        if not task:
+            await _mutex.acquire()
+            continue
+        q.task_done()
+        res = await work(task)
+        writer.write(__struct(res))
+        await writer.drain()
+        writer.close()
+
+
+async def work(instance):
+    def __work(task):
+        try:
+            res = task.execute()
+        except Exception as ex:
+            logger.error(ex)
+            res = data_format.copy()
+            res['success'] = False
+            res['message'] = str(ex)
+        return res
+    return await loop.run_in_executor(None, __work, instance)
+
+
+async def produce(queue, instance, writer):
+    await queue.put((instance, writer))
+    _mutex.release()
+
+
+async def handle(reader, writer):
+    message = b''
+    while True:
+        pkg = await reader.read(BUF_SIZE)
+        message += pkg
+        if len(pkg) < BUF_SIZE:
+            break
+    try:
+        instance = create_task(message)
+        queue = _queues[instance.level - 1 if 0 < instance.level < 5 else 4]
+        await produce(queue, instance, writer)
+    except UnknownServiceError as ex:
+        res = data_format.copy()
+        res['success'] = False
+        res['message'] = '[10001]%s' % ex
+        writer.write(__struct(res))
+        await writer.drain()
+        writer.close()
+    except ParamsError:
+        res = data_format.copy()
+        res['success'] = False
+        res['message'] = '[10004]'
+        writer.write(__struct(res))
+        await writer.drain()
+        writer.close()
+
+
+def main(port):
+    thread_count = min(32, (os.cpu_count() or 1) + 4)
+
+    for i in range(thread_count):
+        logger.info(f'Consumer {i + 1} started')
+        asyncio.ensure_future(consume())
+
+    coro = asyncio.start_server(handle, '', port)
+    server = loop.run_until_complete(coro)
+
+    # Serve requests until Ctrl+C is pressed
+    logger.info('Serving on {}'.format(server.sockets[0].getsockname()))
+    try:
+        loop.run_forever()
+    except (KeyboardInterrupt, SystemExit):
+        # Close the server
+        server.close()
+        loop.run_until_complete(server.wait_closed())
+        loop.close()
+        raise

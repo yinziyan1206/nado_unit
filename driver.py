@@ -10,6 +10,7 @@ from asyncio import QueueEmpty
 from . import utils
 
 BUF_SIZE = 1024
+MAX_SIZE = 2**20 * 5
 HOST = ''
 PORT = 11211
 
@@ -46,6 +47,10 @@ class UnknownServiceError(Exception):
     pass
 
 
+class OutOfBoundError(Exception):
+    pass
+
+
 def __get_unit(command):
     return utils.get_unit(command['service'], command['method'])
 
@@ -56,7 +61,7 @@ def __struct(data):
     return memoryview(('%s' % (length[-12:])).encode() + data)
 
 
-def create_task(message):
+def __create_task(message):
     command = pickle.loads(message, encoding='utf-8')
     if 'service' in command and 'method' in command:
         ret, task = __get_unit(command)
@@ -110,13 +115,18 @@ async def produce(queue, instance, writer):
 
 async def handle(reader, writer):
     message = b''
-    while True:
-        pkg = await reader.read(BUF_SIZE)
-        message += pkg
-        if len(pkg) < BUF_SIZE:
-            break
+    total = 0
     try:
-        instance = create_task(message)
+        while True:
+            pkg = await reader.read(BUF_SIZE)
+            message += pkg
+            if len(pkg) < BUF_SIZE:
+                break
+            total += BUF_SIZE
+            if total > MAX_SIZE:
+                raise OutOfBoundError()
+
+        instance = __create_task(message)
         queue = _queues[instance.level - 1 if 0 < instance.level < 5 else 4]
         await produce(queue, instance, writer)
     except UnknownServiceError as ex:
@@ -130,6 +140,13 @@ async def handle(reader, writer):
         res = data_format.copy()
         res['success'] = False
         res['message'] = '[10004]'
+        writer.write(__struct(res))
+        await writer.drain()
+        writer.close()
+    except OutOfBoundError:
+        res = data_format.copy()
+        res['success'] = False
+        res['message'] = '[10005]out of bounds'
         writer.write(__struct(res))
         await writer.drain()
         writer.close()

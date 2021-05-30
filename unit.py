@@ -19,12 +19,6 @@ class Unit:
     log = False
     level = 1
 
-    config = {
-        'check_time': 30,
-        'refresh_time': 20,
-        'allow_times': 50,
-    }
-
     error_code = {
         '10001': '访问失败',
         '10002': '非法访问',
@@ -35,8 +29,7 @@ class Unit:
         '10007': '其他错误',
     }
 
-    risk = {
-    }
+    _risk = set()
 
     def __init__(self, content, operator: str = '', ip: str = ''):
         self.content = content
@@ -47,29 +40,13 @@ class Unit:
         self.data: Dict[Any] = dict()
 
     def init(self):
-        ts = int(time.time())
         if not self.operator:
+            self.error = Unit.error_msg('10002', '请稍后再试')
             return False
-        try:
-            if self.ip not in self.__class__.risk \
-                    or ts - self.__class__.risk[self.ip]['time'] > self.config['check_time']:
-                self.__class__.risk[self.ip] = {
-                    'count': 1,
-                    'time': ts
-                }
-                return True
-            else:
-                count = self.__class__.risk[self.ip]['count']
-                if count < self.config['allow_times']:
-                    self.__class__.risk[self.ip]['count'] += 1
-                    return True
-                if ts - self.__class__.risk[self.ip]['time'] > self.config['refresh_time']:
-                    self.__class__.risk[self.ip]['time'] = ts - self.config['refresh_time']
+        if self.ip in self.__class__._risk:
             self.error = Unit.error_msg('10003', '请稍后再试')
             return False
-        except Exception as ex:
-            self.error = Unit.error_msg('10005', str(ex))
-            return False
+        return True
 
     def before_validate(self):
         pass  # user apply for dev service

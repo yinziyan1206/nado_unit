@@ -22,7 +22,7 @@ class Unit:
     config = {
         'check_time': 30,
         'refresh_time': 20,
-        'allow_time': 50,
+        'allow_times': 50,
     }
 
     error_code = {

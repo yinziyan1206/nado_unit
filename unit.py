@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 __author__ = 'ziyan.yin'
 
-import time
 from typing import Any, Dict
+import logging
+
+logger = logging.getLogger('unit')
 
 
 class Unit:
@@ -91,10 +93,10 @@ class Unit:
                 self.logger(True, '')
             return Unit.format(True, self.data, '')
         except Exception as ex:
-            self.error = str(ex)
+            logger.exception(ex)
             if self.log:
-                self.logger(False, self.error)
-            return Unit.format(False, [], str(self.error))
+                self.logger(False, str(ex))
+            return Unit.format(False, [], str(ex))
 
     def logger(self, result, msg):
         raise NotImplementedError()

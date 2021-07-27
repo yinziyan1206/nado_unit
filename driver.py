@@ -7,8 +7,7 @@ import os
 import pickle
 from asyncio import QueueEmpty
 
-from unit import AioUnit
-from . import utils
+from . import utils, AioUnit
 
 BUF_SIZE = 1024
 MAX_SIZE = 2**20 * 5

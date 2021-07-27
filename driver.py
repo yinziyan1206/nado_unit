@@ -7,6 +7,7 @@ import os
 import pickle
 from asyncio import QueueEmpty
 
+from unit import AioUnit
 from . import utils
 
 BUF_SIZE = 1024
@@ -94,16 +95,28 @@ async def consume():
 
 
 async def work(instance):
-    def __work(task):
-        try:
-            res = task.execute()
-        except Exception as ex:
-            logger.error(ex)
-            res = data_format.copy()
-            res['success'] = False
-            res['message'] = str(ex)
-        return res
-    return await loop.run_in_executor(None, __work, instance)
+    if issubclass(instance, AioUnit):
+        async def __work(task):
+            try:
+                res = await task.execute()
+            except Exception as ex:
+                logger.error(ex)
+                res = data_format.copy()
+                res['success'] = False
+                res['message'] = str(ex)
+            return res
+        return await __work(instance)
+    else:
+        def __work(task):
+            try:
+                res = task.execute()
+            except Exception as ex:
+                logger.error(ex)
+                res = data_format.copy()
+                res['success'] = False
+                res['message'] = str(ex)
+            return res
+        return await loop.run_in_executor(None, __work, instance)
 
 
 async def produce(queue, instance, writer):

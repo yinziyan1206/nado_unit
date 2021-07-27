@@ -115,4 +115,58 @@ class Unit:
         return '[{0}]{1}'.format(code, msg)
 
 
+class AioUnit(Unit):
+
+    async def before_validate(self):
+        pass  # user apply for dev service
+
+    async def validate(self):
+        return True
+
+    async def after_validate(self):
+        pass  # user apply for dev service
+
+    async def before_process(self):
+        pass  # user apply for dev service
+
+    async def process(self):
+        return True
+
+    async def after_process(self):
+        pass  # user apply for dev service
+
+    async def logger(self, result, msg):
+        raise NotImplementedError()
+
+    async def _execute(self):
+        try:
+            await self.before_validate()
+            if not await self.validate():
+                if self.log:
+                    await self.logger(False, self.error)
+                return Unit.format(False, [], str(self.error))
+            await self.after_validate()
+            await self.before_process()
+            if not await self.process():
+                if self.log:
+                    await self.logger(False, self.error)
+                return Unit.format(False, [], str(self.error))
+            await self.after_process()
+            if self.log:
+                await self.logger(True, '')
+            return Unit.format(True, self.data, '')
+        except Exception as ex:
+            logger.exception(ex)
+            if self.log:
+                await self.logger(False, str(ex))
+            return Unit.format(False, [], str(ex))
+
+    async def execute(self):
+        if not self.init():
+            if self.log:
+                await self.logger(False, self.error)
+            return Unit.format(False, [], str(self.error))
+        return await self._execute()
+
+
 units: Dict[str, Dict[str, Unit]] = dict()

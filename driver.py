@@ -56,9 +56,7 @@ def __get_unit(command):
 
 
 def __struct(data):
-    data = pickle.dumps(data, protocol=5)
-    length = '00000000000{0}'.format(len(data))
-    return memoryview(('%s' % (length[-12:])).encode() + data)
+    return memoryview(pickle.dumps(data, protocol=5))
 
 
 def __create_task(message):

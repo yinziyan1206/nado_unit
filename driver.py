@@ -94,7 +94,7 @@ async def consume():
 
 
 async def work(instance):
-    if issubclass(instance, AioUnit):
+    if issubclass(type(instance), AioUnit):
         async def __work(task):
             try:
                 res = await task.execute()

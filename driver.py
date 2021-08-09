@@ -6,6 +6,7 @@ import logging
 import os
 import pickle
 from asyncio import QueueEmpty
+from nado_utils import cryptutils
 
 from . import utils, AioUnit
 
@@ -43,6 +44,10 @@ class ParamsError(Exception):
     pass
 
 
+class ParamsError(Exception):
+    pass
+
+
 class UnknownServiceError(Exception):
     pass
 
@@ -61,6 +66,14 @@ def __struct(data):
 
 def __create_task(message):
     command = pickle.loads(message, encoding='utf-8')
+    if 'signature' not in command:
+        raise ParamsError()
+    else:
+        signature = command['signature']
+        del command['signature']
+        if signature != cryptutils.sha256(str(command) + 'NadoUnit'):
+            raise ParamsError()
+
     if 'service' in command and 'method' in command:
         ret, task = __get_unit(command)
         if ret:

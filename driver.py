@@ -175,7 +175,7 @@ async def handle(reader, writer):
         writer.close()
 
 
-def main(port):
+def main(port, initial=None):
     thread_count = min(32, (os.cpu_count() or 1) + 4)
 
     for i in range(thread_count):
@@ -183,6 +183,8 @@ def main(port):
         asyncio.ensure_future(consume())
 
     coro = asyncio.start_server(handle, '', port)
+    if initial:
+        loop.run_until_complete(initial())
     server = loop.run_until_complete(coro)
 
     # Serve requests until Ctrl+C is pressed

@@ -100,10 +100,14 @@ async def consume():
             await _mutex.acquire()
             continue
         q.task_done()
-        res = await work(task)
-        writer.write(__struct(res))
-        await writer.drain()
-        writer.close()
+        asyncio.create_task(work_coroutine(writer, task))
+
+
+async def work_coroutine(writer, task):
+    res = await work(task)
+    writer.write(__struct(res))
+    await writer.drain()
+    writer.close()
 
 
 async def work(instance):

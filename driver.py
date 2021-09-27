@@ -153,7 +153,7 @@ async def handle(reader, writer):
             if total > MAX_SIZE:
                 raise OutOfBoundError()
 
-        instance = __create_task(message.removeprefix(b'\r\n\r\n'))
+        instance = __create_task(message.removesuffix(b'\r\n\r\n'))
         queue = _queues[instance.level - 1 if 0 < instance.level < 5 else 4]
         await produce(queue, instance, writer)
     except UnknownServiceError as ex:

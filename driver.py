@@ -141,19 +141,13 @@ async def produce(queue, instance, writer):
 
 
 async def handle(reader, writer):
-    message = b''
-    total = 0
     try:
-        while True:
-            pkg = await reader.read(BUF_SIZE)
-            message += pkg
-            if pkg.endswith(b'\r\n\r\n'):
-                break
-            total += BUF_SIZE
-            if total > MAX_SIZE:
-                raise OutOfBoundError()
+        content_length = int((await reader.read(16)).removesuffix(b'\r\n\r\n'))
+        if content_length > MAX_SIZE:
+            raise OutOfBoundError()
+        message = await reader.read(content_length)
 
-        instance = __create_task(message.removesuffix(b'\r\n\r\n'))
+        instance = __create_task(message)
         queue = _queues[instance.level - 1 if 0 < instance.level < 5 else 4]
         await produce(queue, instance, writer)
     except UnknownServiceError as ex:

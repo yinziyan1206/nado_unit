@@ -100,7 +100,7 @@ async def consume():
             await _mutex.acquire()
             continue
         q.task_done()
-        asyncio.create_task(work_coroutine(writer, task))
+        await work_coroutine(writer, task)
 
 
 async def work_coroutine(writer, task):
@@ -174,7 +174,7 @@ async def handle(reader, writer):
 
 
 def main(port, initial=None):
-    thread_count = min(32, (os.cpu_count() or 1) + 4)
+    thread_count = min(32, 2 * (os.cpu_count() or 1) + 4)
 
     for i in range(thread_count):
         logger.info(f'Consumer {i + 1} started')

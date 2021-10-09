@@ -99,7 +99,7 @@ async def consume():
         if not task:
             await _mutex.acquire()
             continue
-        logger.info('get task %s' % task.__name__)
+        logger.info('get task %s' % str(task))
         await work_coroutine(writer, task)
         q.task_done()
 

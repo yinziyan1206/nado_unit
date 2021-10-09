@@ -37,7 +37,7 @@ if loop_policy:
 loop = asyncio.get_event_loop()
 
 _queues = [asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()]
-_mutex = asyncio.Semaphore()
+_mutex = asyncio.Lock()
 
 
 class ParamsError(Exception):
@@ -99,8 +99,9 @@ async def consume():
         if not task:
             await _mutex.acquire()
             continue
-        q.task_done()
+        logger.info('get task %s' % task.__name__)
         await work_coroutine(writer, task)
+        q.task_done()
 
 
 async def work_coroutine(writer, task):

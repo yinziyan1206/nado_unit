@@ -138,7 +138,8 @@ async def work(instance):
 
 async def produce(queue, instance, writer):
     await queue.put((instance, writer))
-    _mutex.release()
+    if _mutex.locked():
+        _mutex.release()
 
 
 async def handle(reader, writer):

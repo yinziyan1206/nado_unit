@@ -29,19 +29,13 @@ logger = logging.getLogger('unit')
 
 try:
     import uvloop as loop_policy
+    asyncio.set_event_loop_policy(loop_policy.EventLoopPolicy())
 except ImportError:
     loop_policy = None
 
-if loop_policy:
-    asyncio.set_event_loop_policy(loop_policy.EventLoopPolicy())
 loop = asyncio.get_event_loop()
 
-_queues = [asyncio.Queue(), asyncio.Queue(), asyncio.Queue(), asyncio.Queue()]
-_mutex = asyncio.Lock()
-
-
-class ParamsError(Exception):
-    pass
+_queue = asyncio.PriorityQueue()
 
 
 class ParamsError(Exception):
@@ -87,21 +81,10 @@ def __create_task(message):
 
 async def consume():
     while True:
-        q = _queues[0]
-        task, writer = None, None
-        for queue in _queues:
-            try:
-                task, writer = queue.get_nowait()
-                q = queue
-                break
-            except QueueEmpty:
-                continue
-        if not task:
-            await _mutex.acquire()
-            continue
-        logger.info('get task %s' % str(task))
+        task, writer = (await _queue.get())[1]
+        logger.info('get task %s' % task.__class__.__name__)
         await work_coroutine(writer, task)
-        q.task_done()
+        _queue.task_done()
 
 
 async def work_coroutine(writer, task):
@@ -136,10 +119,8 @@ async def work(instance):
         return await loop.run_in_executor(None, __work, instance)
 
 
-async def produce(queue, instance, writer):
-    await queue.put((instance, writer))
-    if _mutex.locked():
-        _mutex.release()
+async def produce(instance, writer):
+    await _queue.put((instance.level - 1 if 0 < instance.level < 5 else 4, (instance, writer)))
 
 
 async def handle(reader, writer):
@@ -148,10 +129,8 @@ async def handle(reader, writer):
         if content_length > MAX_SIZE:
             raise OutOfBoundError()
         message = await reader.read(content_length)
-
         instance = __create_task(message)
-        queue = _queues[instance.level - 1 if 0 < instance.level < 5 else 4]
-        await produce(queue, instance, writer)
+        await produce(instance, writer)
     except UnknownServiceError as ex:
         res = data_format.copy()
         res['success'] = False

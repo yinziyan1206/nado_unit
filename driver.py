@@ -81,7 +81,7 @@ def __create_task(message):
 
 async def consume():
     while True:
-        task, writer = (await _queue.get())[1]
+        task, writer = await _queue.get()
         logger.info('get task %s' % task.__class__.__name__)
         await work_coroutine(writer, task)
         _queue.task_done()
@@ -120,7 +120,7 @@ async def work(instance):
 
 
 async def produce(instance, writer):
-    await _queue.put((instance.level - 1 if 0 < instance.level < 5 else 4, (instance, writer)))
+    await _queue.put((instance, writer))
 
 
 async def handle(reader, writer):

@@ -114,6 +114,9 @@ class Unit:
     def error_msg(code, msg):
         return '[{0}]{1}'.format(code, msg)
 
+    def __lt__(self, other):
+        return self.level < other.level
+
 
 class AioUnit(Unit):
 

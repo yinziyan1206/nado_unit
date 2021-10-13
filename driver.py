@@ -119,7 +119,6 @@ async def work(instance):
 
 
 async def produce(instance, writer):
-    logger.info('recv task %s' % instance.__class__.__name__)
     await _queue.put((instance, writer))
 
 
@@ -130,7 +129,11 @@ async def handle(reader, writer):
             raise OutOfBoundError()
         message = await reader.read(content_length)
         instance = __create_task(message)
-        await produce(instance, writer)
+        logger.info('recv task %s' % instance.__class__.__name__)
+        if instance.level <= 1:
+            await work_coroutine(writer, instance)
+        else:
+            await produce(instance, writer)
     except UnknownServiceError as ex:
         res = data_format.copy()
         res['success'] = False

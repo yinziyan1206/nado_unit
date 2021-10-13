@@ -95,26 +95,10 @@ async def work_coroutine(writer, task):
 
 async def work(instance):
     if issubclass(type(instance), AioUnit):
-        async def __work(task):
-            try:
-                res = await task.execute()
-            except Exception as ex:
-                logger.error(ex)
-                res = data_format.copy()
-                res['success'] = False
-                res['message'] = str(ex)
-            return res
-        return await __work(instance)
+        return await instance.execute()
     else:
         def __work(task):
-            try:
-                res = task.execute()
-            except Exception as ex:
-                logger.error(ex)
-                res = data_format.copy()
-                res['success'] = False
-                res['message'] = str(ex)
-            return res
+            return task.execute()
         return await loop.run_in_executor(None, __work, instance)
 
 
@@ -158,7 +142,7 @@ async def handle(reader, writer):
 
 
 def main(port, initial=None):
-    thread_count = min(32, 2 * (os.cpu_count() or 1) + 4)
+    thread_count = min(32, (os.cpu_count() or 1) + 4)
 
     for i in range(thread_count):
         logger.info(f'Consumer {i + 1} started')

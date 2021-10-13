@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 __author__ = 'ziyan.yin'
 
+import asyncio
 from typing import Any, Dict
 import logging
 
@@ -146,28 +147,28 @@ class AioUnit(Unit):
             await self.before_validate()
             if not await self.validate():
                 if self.log:
-                    await self.logger(False, self.error)
+                    asyncio.run(self.logger(False, self.error))
                 return Unit.format(False, [], str(self.error))
             await self.after_validate()
             await self.before_process()
             if not await self.process():
                 if self.log:
-                    await self.logger(False, self.error)
+                    asyncio.run(self.logger(False, self.error))
                 return Unit.format(False, [], str(self.error))
             await self.after_process()
             if self.log:
-                await self.logger(True, '')
+                asyncio.run(self.logger(True, ''))
             return Unit.format(True, self.data, '')
         except Exception as ex:
             logger.exception(ex)
             if self.log:
-                await self.logger(False, str(ex))
+                asyncio.run(self.logger(False, self.error))
             return Unit.format(False, [], str(ex))
 
     async def execute(self):
         if not self.init():
             if self.log:
-                await self.logger(False, self.error)
+                asyncio.run(self.logger(False, self.error))
             return Unit.format(False, [], str(self.error))
         return await self._execute()
 

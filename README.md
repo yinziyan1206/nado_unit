@@ -1,2 +1,2 @@
 # nado_unit
-nado process unit package
+nado unit sidecar
